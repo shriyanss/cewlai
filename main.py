@@ -6,6 +6,7 @@ import random
 import sys
 import logging
 import warnings
+import tiktoken
 
 import google.generativeai as genai
 
@@ -67,9 +68,16 @@ def parse_args():
 
 def get_seed_domains(args):
     """
-    Retrieves initial seed domains from arguments (either -t or -tL).
+    Retrieves initial seed domains from arguments (either -t, -tL, or stdin).
     """
     seed_domains = set()
+
+    # Check if we have data on stdin
+    if not sys.stdin.isatty():
+        for line in sys.stdin:
+            line = line.strip()
+            if line:
+                seed_domains.add(line)
 
     # Single target if provided
     if args.target:
@@ -131,21 +139,41 @@ def generate_new_domains(chat_session, domain_list, verbose=False):
 
 def estimate_tokens(domain_list):
     """
-    Provides a rough estimate of tokens that will be used in the prompt.
-    This is a very rough approximation - actual token count may vary.
+    Provides an accurate token count using tiktoken.
+    Returns truncated domain list and token count.
     """
-    # Rough estimation: average 1.5 tokens per word/domain
-    domains_text = ', '.join(domain_list)
+    MAX_TOKENS = 100000
+    enc = tiktoken.get_encoding("cl100k_base")  # Using OpenAI's encoding as approximation
+    
+    # Build the prompt template without domains first
     prompt_template = (
         "Here is a list of domains:\n"
-        f"{domains_text}\n\n"
+        "{domains}\n\n"
         "It's your job to output unique new domains that are likely to exist "
         "based on variations or predictive patterns you see in the existing list. "
         "In your output, none of the domains should repeat. "
-        "Please output them one domain per line. Make your response very long. I want a lot of domains."
+        "Please output them one domain per line."
     )
-    # Very rough estimation
-    return len(prompt_template.split()) * 1.5
+    
+    # Get base token count without domains
+    base_tokens = len(enc.encode(prompt_template.format(domains="")))
+    
+    # Calculate how many domains we can include
+    truncated_domains = []
+    current_tokens = base_tokens
+    
+    for domain in domain_list:
+        domain_tokens = len(enc.encode(domain + ", "))
+        if current_tokens + domain_tokens > MAX_TOKENS:
+            break
+        truncated_domains.append(domain)
+        current_tokens += domain_tokens
+    
+    # Calculate final token count with actual domains
+    final_prompt = prompt_template.format(domains=", ".join(truncated_domains))
+    total_tokens = len(enc.encode(final_prompt))
+    
+    return truncated_domains, total_tokens
 
 def main():
     args = parse_args()
@@ -153,24 +181,34 @@ def main():
     # Prepare the LLM chat session
     chat_session = configure_llm()
 
-    # Get initial domain list
+    # Get initial domain list and check if using stdin
+    using_stdin = not sys.stdin.isatty()
     seed_domains = get_seed_domains(args)
     if not seed_domains:
-        print("[!] No seed domains provided. Use -t or -tL.", file=sys.stderr)
+        print("[!] No seed domains provided. Use -t, -tL, or pipe domains to stdin.", file=sys.stderr)
         sys.exit(1)
 
-    # Estimate token usage
-    estimated_tokens = estimate_tokens(seed_domains)
+    # Get token-truncated domain list and count
+    seed_domains, estimated_tokens = estimate_tokens(seed_domains)
     estimated_total = estimated_tokens * args.loop
     
-    if not args.force:
+    if args.verbose:
+        if len(seed_domains) < len(get_seed_domains(args)):
+            print(f"\n[!] Input truncated to {len(seed_domains)} domains to stay under token limit")
+    
+    # Skip confirmation if using --force or stdin
+    if not (args.force or using_stdin):
         print(f"\nEstimated token usage:")
-        print(f"* Per iteration: ~{int(estimated_tokens)} tokens")
-        print(f"* Total for {args.loop} loops: ~{int(estimated_total)} tokens")
+        print(f"* Per iteration: ~{estimated_tokens} tokens")
+        print(f"* Total for {args.loop} loops: ~{estimated_total} tokens")
         response = input("\nContinue? [y/N] ").lower()
         if response != 'y':
             print("Aborting.")
             sys.exit(0)
+    elif args.verbose:
+        print(f"\nEstimated token usage:")
+        print(f"* Per iteration: ~{estimated_tokens} tokens")
+        print(f"* Total for {args.loop} loops: ~{estimated_total} tokens")
 
     # We store all domains in a global set to avoid duplicates across loops
     all_domains = set(seed_domains)

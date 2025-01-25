@@ -29,6 +29,56 @@ CewlAI is a domain generation tool that uses Google's Gemini AI to create potent
 3. Set up your Google API key:
    export GEMINI_API_KEY='your-api-key-here'
 
+## Input Methods
+
+The tool supports multiple ways to provide seed domains:
+
+1. Single domain via command line:
+   ```
+   python main.py -t example.com
+   ```
+
+2. List of domains from a file:
+   ```
+   python main.py -tL domains.txt
+   ```
+
+3. Domains from stdin (pipe or redirect):
+   ```
+   cat domains.txt | python main.py
+   # or
+   echo "example.com" | python main.py
+   ```
+
+Note: When using stdin, the token usage confirmation is automatically skipped.
+
+You can also combine these methods:
+   ```
+   cat additional_domains.txt | python main.py -t example.com -tL domains.txt
+   ```
+
+## Token Management
+
+The tool automatically manages token usage to stay within API limits:
+
+- Input is automatically truncated if it exceeds 100,000 tokens
+- Use `-v` flag to see when truncation occurs
+- Token usage estimates are shown before processing begins
+- Use `--force` to skip the token usage confirmation prompt
+
+Example output with truncation:
+   ```
+   $ cat large_domain_list.txt | python main.py -v
+   
+   [!] Input truncated to 15423 domains to stay under token limit
+   
+   Estimated token usage:
+   * Per iteration: ~98750 tokens
+   * Total for 1 loops: ~98750 tokens
+   
+   Continue? [y/N]
+   ```
+
 ## Usage
 
 Basic usage:
@@ -71,17 +121,6 @@ The tool will generate new domains based on patterns it recognizes in your seed 
 Only newly generated domains are shown in the output (seed domains are excluded).
 
 ## Advanced Usage
-
-### Token Management
-
-The tool estimates token usage before running to help manage API costs. You'll see an estimation like:
-
-Estimated token usage:
-* Per iteration: ~150 tokens
-* Total for 3 loops: ~450 tokens
-Continue? [y/N]
-
-Use the --force flag to skip this confirmation.
 
 ### Input File Format
 
