@@ -2,7 +2,7 @@
 
 <img width="758" alt="Screenshot 2025-01-24 at 9 51 33 PM" src="https://github.com/user-attachments/assets/a01d3ad7-733b-4822-b1e4-42b931194276" />
 
-CewlAI is a domain generation tool that uses Google's Gemini AI to create potential domain variations based on seed domains. It's inspired by tools like CeWL but focuses on domain name pattern recognition and generation.
+CewlAI is a domain generation tool that uses Google's Gemini AI to create potential domain variations based on seed domains. It's inspired by dnscewl which was inspired by CeWL, but this tool focuses on domain name pattern recognition and generation.
 
 ## Features
 
