@@ -129,7 +129,7 @@ def generate_new_domains(chat_session, domain_list, verbose=False, use_openai=Fa
             # Use OpenAI
             client = openai.OpenAI()
             response = client.chat.completions.create(
-                model="gpt-4o",
+                model="gpt-4o-mini",
                 messages=[
                     {"role": "system", "content": "You are tasked with thinking of similar domains."},
                     {"role": "user", "content": prompt_text}
